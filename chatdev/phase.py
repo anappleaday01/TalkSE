@@ -657,3 +657,144 @@ class Manual(Phase):
         chat_env._update_manuals(self.seminar_conclusion)
         chat_env.rewrite_manuals()
         return chat_env
+
+
+class SoftwareRequirementsSpecificationPhase(Phase):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.assistant_role_name = "Requirements Analyst"
+        self.user_role_name = "Chief Executive Officer"
+
+    def update_phase_env(self, chat_env):
+        self.phase_env.update({
+            "task": chat_env.env_dict['task_prompt'],
+            "description": chat_env.env_dict.get('task_description', ''),
+            "modality": chat_env.env_dict.get('modality', ''),
+            "ideas": chat_env.env_dict.get('ideas', '')
+        })
+
+    def update_chat_env(self, chat_env) -> ChatEnv:
+        srs_content = self.seminar_conclusion
+        chat_env.env_dict['srs_document_content'] = srs_content
+        
+        # 保存SRS文档
+        filepath = os.path.join(chat_env.env_dict['directory'], "docs")
+        os.makedirs(filepath, exist_ok=True)
+        with open(os.path.join(filepath, "SoftwareRequirementsSpecification.md"), "w", encoding="utf-8") as f:
+            f.write(srs_content)
+        
+        log_visualize("**[SRS Document Generated]**: SoftwareRequirementsSpecification.md")
+        return chat_env
+
+
+class ArchitecturalDesignPhase(Phase):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.assistant_role_name = "Software Architect"
+        self.user_role_name = "Lead Developer"
+
+    def update_phase_env(self, chat_env):
+        self.phase_env.update({
+            "task": chat_env.env_dict['task_prompt'],
+            "srs_content": chat_env.env_dict.get('srs_document_content', ''),
+            "modality": chat_env.env_dict.get('modality', ''),
+            "language": chat_env.env_dict.get('language', '')
+        })
+
+    def update_chat_env(self, chat_env) -> ChatEnv:
+        architecture_content = self.seminar_conclusion
+        chat_env.env_dict['architecture_document_content'] = architecture_content
+        
+        # 保存架构设计文档
+        filepath = os.path.join(chat_env.env_dict['directory'], "docs")
+        os.makedirs(filepath, exist_ok=True)
+        with open(os.path.join(filepath, "ArchitecturalDesign.md"), "w", encoding="utf-8") as f:
+            f.write(architecture_content)
+            
+        log_visualize("**[Architecture Document Generated]**: ArchitecturalDesign.md")
+        return chat_env
+
+
+class DatabaseDesignPhase(Phase):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.assistant_role_name = "Database Architect"
+        self.user_role_name = "Software Architect"
+
+    def update_phase_env(self, chat_env):
+        self.phase_env.update({
+            "task": chat_env.env_dict['task_prompt'],
+            "srs_content": chat_env.env_dict.get('srs_document_content', ''),
+            "architecture_content": chat_env.env_dict.get('architecture_document_content', ''),
+            "language": chat_env.env_dict.get('language', '')
+        })
+
+    def update_chat_env(self, chat_env) -> ChatEnv:
+        db_design_content = self.seminar_conclusion
+        chat_env.env_dict['database_design_document_content'] = db_design_content
+        
+        # 保存数据库设计文档和SQL脚本
+        filepath = os.path.join(chat_env.env_dict['directory'], "docs")
+        os.makedirs(filepath, exist_ok=True)
+        
+        # 保存完整的数据库设计文档
+        with open(os.path.join(filepath, "DatabaseDesign.md"), "w", encoding="utf-8") as f:
+            f.write(db_design_content)
+            
+        # 提取并保存SQL脚本（假设SQL代码块被```sql和```包围）
+        sql_content = extract_sql_blocks(db_design_content)  # 需要实现此函数
+        if sql_content:
+            with open(os.path.join(filepath, "DatabaseSchema.sql"), "w", encoding="utf-8") as f:
+                f.write(sql_content)
+        
+        log_visualize("**[Database Design Documents Generated]**: DatabaseDesign.md, DatabaseSchema.sql")
+        return chat_env
+
+
+class TestCaseGenerationPhase(Phase):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.assistant_role_name = "Software Test Engineer"
+        self.user_role_name = "Developer"
+
+    def update_phase_env(self, chat_env):
+        self.phase_env.update({
+            "task": chat_env.env_dict['task_prompt'],
+            "srs_content": chat_env.env_dict.get('srs_document_content', ''),
+            "architecture_content": chat_env.env_dict.get('architecture_document_content', ''),
+            "language": chat_env.env_dict.get('language', ''),
+            "codes": chat_env.get_codes()
+        })
+
+    def update_chat_env(self, chat_env) -> ChatEnv:
+        test_cases_content = self.seminar_conclusion
+        chat_env.env_dict['test_cases_content'] = test_cases_content
+        
+        # 保存测试用例文档
+        filepath = os.path.join(chat_env.env_dict['directory'], "tests")
+        os.makedirs(filepath, exist_ok=True)
+        with open(os.path.join(filepath, "TestCases.md"), "w", encoding="utf-8") as f:
+            f.write(test_cases_content)
+            
+        # 提取并保存测试代码（如果有）
+        test_code = extract_test_code(test_cases_content)  # 需要实现此函数
+        if test_code:
+            with open(os.path.join(filepath, "test_suite.py"), "w", encoding="utf-8") as f:
+                f.write(test_code)
+        
+        log_visualize("**[Test Cases Generated]**: TestCases.md, test_suite.py")
+        return chat_env
+
+
+def extract_sql_blocks(content: str) -> str:
+    """从Markdown内容中提取SQL代码块"""
+    import re
+    sql_blocks = re.findall(r'```sql\n(.*?)\n```', content, re.DOTALL)
+    return '\n\n'.join(sql_blocks)
+
+
+def extract_test_code(content: str) -> str:
+    """从Markdown内容中提取测试代码"""
+    import re
+    code_blocks = re.findall(r'```python\n(.*?)\n```', content, re.DOTALL)
+    return '\n\n'.join(code_blocks)
